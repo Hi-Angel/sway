@@ -63,7 +63,14 @@ struct sway_keyboard {
 
 	struct wl_event_source *key_repeat_source;
 	struct sway_binding *repeat_binding;
+	xkb_layout_index_t default_kbd_layout;
 };
+
+struct sway_layout_per_kbd {
+	struct wlr_keyboard *kbd;
+	xkb_layout_index_t layout;
+};
+
 
 struct sway_keyboard *sway_keyboard_create(struct sway_seat *seat,
 		struct sway_seat_device *device);
@@ -71,6 +78,10 @@ struct sway_keyboard *sway_keyboard_create(struct sway_seat *seat,
 void sway_keyboard_configure(struct sway_keyboard *keyboard);
 
 void sway_keyboard_destroy(struct sway_keyboard *keyboard);
+
+void sway_keyboard_set_layout(struct wlr_keyboard *kbd, xkb_layout_index_t layout);
+
+xkb_layout_index_t sway_keyboard_get_layout(struct xkb_state *kbd_state);
 
 void sway_keyboard_disarm_key_repeat(struct sway_keyboard *keyboard);
 #endif

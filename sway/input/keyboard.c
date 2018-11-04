@@ -12,6 +12,7 @@
 #include "sway/input/keyboard.h"
 #include "sway/input/seat.h"
 #include "sway/ipc-server.h"
+#include "sway/tree/view.h"
 #include "log.h"
 
 static struct modifier_key {
@@ -425,7 +426,7 @@ static void determine_bar_visibility(uint32_t modifiers) {
 	for (int i = 0; i < config->bars->length; ++i) {
 		struct bar_config *bar = config->bars->items[i];
 		if (strcmp(bar->mode, bar->hidden_state) == 0) { // both are "hide"
-			bool should_be_visible = 
+			bool should_be_visible =
 				bar->modifier != 0 && (~modifiers & bar->modifier) == 0;
 			if (bar->visible_by_modifier != should_be_visible) {
 				bar->visible_by_modifier = should_be_visible;
@@ -447,6 +448,20 @@ static void handle_keyboard_modifiers(struct wl_listener *listener,
 
 	uint32_t modifiers = wlr_keyboard_get_modifiers(wlr_device->keyboard);
 	determine_bar_visibility(modifiers);
+}
+
+static void add_kbd_to_view(struct sway_container *con, void *data) {
+	if (!con->view) {
+		return;
+	}
+
+	struct sway_layout_per_kbd *lpk = calloc(1, sizeof(struct sway_layout_per_kbd));
+	if (!sway_assert(lpk, "Failed to allocate sway_layout_per_kbd")) {
+		return;
+	}
+
+	*lpk = *(struct sway_layout_per_kbd *)data;
+	list_add(con->view->kbd_layouts, lpk);
 }
 
 struct sway_keyboard *sway_keyboard_create(struct sway_seat *seat,
@@ -572,6 +587,32 @@ void sway_keyboard_configure(struct sway_keyboard *keyboard) {
 	wl_signal_add(&wlr_device->keyboard->events.modifiers,
 		&keyboard->keyboard_modifiers);
 	keyboard->keyboard_modifiers.notify = handle_keyboard_modifiers;
+
+	keyboard->default_kbd_layout =
+		sway_keyboard_get_layout(wlr_device->keyboard->xkb_state);
+	struct sway_layout_per_kbd lpk = {
+		.kbd = wlr_device->keyboard,
+		.layout = keyboard->default_kbd_layout
+	};
+	root_for_each_container(add_kbd_to_view, &lpk);
+}
+
+static void rm_kbd_from_view(struct sway_container *con, void *data) {
+	if (!con->view) {
+		return;
+	}
+
+	list_t *kbd_layouts = con->view->kbd_layouts;
+	for (int i = 0; i < kbd_layouts->length; ++i) {
+		struct sway_layout_per_kbd *lpk = kbd_layouts->items[i];
+		if (lpk->kbd == (struct wlr_keyboard *)data) {
+			free(lpk);
+			list_del(kbd_layouts, i);
+			return;
+		}
+	}
+	sway_assert(false,
+			"sway_layout_per_kbd not found in sway_view for removal");
 }
 
 void sway_keyboard_destroy(struct sway_keyboard *keyboard) {
@@ -585,5 +626,19 @@ void sway_keyboard_destroy(struct sway_keyboard *keyboard) {
 	wl_list_remove(&keyboard->keyboard_modifiers.link);
 	sway_keyboard_disarm_key_repeat(keyboard);
 	wl_event_source_remove(keyboard->key_repeat_source);
+	root_for_each_container(rm_kbd_from_view,
+			keyboard->seat_device->input_device->wlr_device->keyboard);
 	free(keyboard);
+}
+
+void sway_keyboard_set_layout(struct wlr_keyboard *kbd, xkb_layout_index_t layout) {
+	wlr_keyboard_notify_modifiers(kbd,
+			kbd->modifiers.depressed,
+			kbd->modifiers.latched,
+			kbd->modifiers.locked,
+			layout);
+}
+
+xkb_layout_index_t sway_keyboard_get_layout(struct xkb_state *kbd_state) {
+	return xkb_state_serialize_layout(kbd_state, XKB_STATE_LAYOUT_EFFECTIVE);
 }
