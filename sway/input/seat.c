@@ -34,7 +34,8 @@ static void seat_device_destroy(struct sway_seat_device *seat_device) {
 		return;
 	}
 
-	sway_keyboard_destroy(seat_device->keyboard);
+	sway_keyboard_destroy(seat_device->keyboard,
+						  seat_device->input_device->wlr_device->keyboard);
 	wlr_cursor_detach_input_device(seat_device->sway_seat->cursor->cursor,
 		seat_device->input_device->wlr_device);
 	wl_list_remove(&seat_device->link);
@@ -80,6 +81,13 @@ static void seat_send_activate(struct sway_node *node, struct sway_seat *seat) {
 	}
 }
 
+static void set_kbd_layouts(const struct sway_view* view) {
+	for(int i = 0; i < view->kbd_layouts->length; ++i) {
+		struct layout_per_kbd* lpk = view->kbd_layouts->items[i];
+		sway_keyboard_set_layout(lpk->kbd, lpk->layout);
+	}
+}
+
 /**
  * If con is a view, set it as active and enable keyboard input.
  * If con is a container, set all child views as active and don't enable
@@ -100,6 +108,8 @@ static void seat_send_focus(struct sway_node *node, struct sway_seat *seat) {
 #endif
 		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat->wlr_seat);
 		if (keyboard) {
+			if (config->keep_layout == LAYOUT_PER_WINDOW)
+				set_kbd_layouts(view);
 			wlr_seat_keyboard_notify_enter(seat->wlr_seat,
 					view->surface, keyboard->keycodes,
 					keyboard->num_keycodes, &keyboard->modifiers);
@@ -597,12 +607,27 @@ static void send_unfocus(struct sway_container *con, void *data) {
 	}
 }
 
+static void save_kbd_layouts(struct sway_view* view) {
+	for(int i = 0; i < view->kbd_layouts->length; ++i) {
+		struct layout_per_kbd* lpk = view->kbd_layouts->items[i];
+		lpk->layout = sway_keyboard_get_layout(lpk->kbd->xkb_state);
+	}
+}
+
 // Unfocus the container and any children (eg. when leaving `focus parent`)
 static void seat_send_unfocus(struct sway_node *node, struct sway_seat *seat) {
 	wlr_seat_keyboard_clear_focus(seat->wlr_seat);
 	if (node->type == N_WORKSPACE) {
 		workspace_for_each_container(node->sway_workspace, send_unfocus, seat);
 	} else {
+		struct sway_view *view = node->type == N_CONTAINER ?
+			node->sway_container->view : NULL;
+
+		if (view && seat_is_input_allowed(seat, view->surface) &&
+			config->keep_layout == LAYOUT_PER_WINDOW) {
+			save_kbd_layouts(view);
+		}
+
 		send_unfocus(node->sway_container, seat);
 		container_for_each_child(node->sway_container, send_unfocus, seat);
 	}

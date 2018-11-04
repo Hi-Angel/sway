@@ -42,13 +42,25 @@ struct sway_keyboard {
 
 	struct wl_event_source *key_repeat_source;
 	struct sway_binding *repeat_binding;
+	xkb_layout_index_t default_kbd_layout;
 };
+
+struct layout_per_kbd {
+    struct wlr_keyboard* kbd;
+	xkb_layout_index_t layout;
+};
+
 
 struct sway_keyboard *sway_keyboard_create(struct sway_seat *seat,
 		struct sway_seat_device *device);
 
 void sway_keyboard_configure(struct sway_keyboard *keyboard);
 
-void sway_keyboard_destroy(struct sway_keyboard *keyboard);
+void sway_keyboard_destroy(struct sway_keyboard *keyboard,
+						   struct wlr_keyboard *wlr_keyboard);
+
+void sway_keyboard_set_layout(struct wlr_keyboard* kbd, xkb_layout_index_t layout);
+
+xkb_layout_index_t sway_keyboard_get_layout(struct xkb_state* kbd_state);
 
 #endif
