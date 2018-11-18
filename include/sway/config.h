@@ -37,6 +37,11 @@ enum binding_flags {
 	BINDING_TITLEBAR=16, // mouse only; trigger on container titlebar
 };
 
+enum keep_kbd_layout {
+	LAYOUT_GLOBAL,
+	LAYOUT_PER_WINDOW
+};
+
 /**
  * A key binding and an associated command.
  */
@@ -459,6 +464,7 @@ struct sway_config {
 			char **argv;
 		} leftovers;
 	} handler_context;
+	enum keep_kbd_layout keep_layout;
 };
 
 /**

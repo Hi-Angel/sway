@@ -90,6 +90,7 @@ static struct cmd_handler handlers[] = {
 	{ "hide_edge_borders", cmd_hide_edge_borders },
 	{ "include", cmd_include },
 	{ "input", cmd_input },
+	{ "keep_kbd_layout", cmd_keep_kbd_layout },
 	{ "mode", cmd_mode },
 	{ "mouse_warping", cmd_mouse_warping },
 	{ "new_float", cmd_default_floating_border },
