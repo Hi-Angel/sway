@@ -158,6 +158,9 @@ set|plus|minus <amount>
 	This can also be used with criteria to set an idle inhibitor for any
 	existing view or with _for_window_ to set idle inhibitors for future views.
 
+*keep_keyboard_layout* global|per_window
+	Controls whether to keep keyboard layout per window. Default is _global_.
+
 *layout* default|splith|splitv|stacking|tabbed
 	Sets the layout mode of the focused container.
 
